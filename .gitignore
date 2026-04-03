@@ -1,0 +1,86 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+.pnpm-debug.log
+
+# TypeScript outputs
+dist/
+build/
+lib/
+out/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.*
+.env.local
+.env.*.local
+
+# Editor and system
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*.tmp
+
+# Logs
+logs/
+*.log
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Test outputs
+coverage/
+nyc_output/
+jest-report.xml
+test-results.xml
+
+# docker
+docker-compose.override.yml
+docker-compose.*.yml
+**/Dockerfile.*
+
+# OS
+*.apk
+*.app
+*.iws
+*.class
+*.iml
+*.ipr
+*.log
+*.patch
+*.pid
+*.seed
+*.jar
+
+# Build system and local caches
+.cache/
+*.cache/
+.svelte-kit/
+.next/
+.nuxt/
+out/
+.vite/
+dist/
+tmp/
+temp/
+
+# IDE/Editor
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# Optional: local data folders
+input/
+output/
+TODO.md
