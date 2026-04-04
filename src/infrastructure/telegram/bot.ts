@@ -12,6 +12,9 @@ import { ScheduleHandler } from "./handlers/schedule.handler";
 import { BroadcastHandler } from "./handlers/broadcast.handler";
 import { MongodbVideoRepository } from "../../video";
 import { MongodbBroadcastRepository, Notifier } from "../../broadcast/broadcast";
+import { User } from "../../domain/entities/user.entitiy";
+import { UserRegistrator } from "../../domain/services/user-registrator";
+import { authMiddleware } from "./middlewares/auth.middleware";
 
 
 export class TelegramNotifier implements Notifier {
@@ -24,7 +27,7 @@ export class TelegramNotifier implements Notifier {
 
 
 export interface SessionData {
-  isAuth: boolean;
+  user?: User;
 }
 
 type BaseContext = Context & SessionFlavor<SessionData>;
@@ -41,6 +44,7 @@ export class TelegramBot {
   constructor(
     private readonly db: Db,
     private readonly cache: Map<string, any>,
+    private readonly userRegistrator: UserRegistrator,
   ) {
     if (!process.env.BOT_TOKEN) {
       throw new Error("The BOT_TOKEN environment variable is missing");
@@ -48,9 +52,7 @@ export class TelegramBot {
 
     this._bot = new Bot<BotContext>(process.env.BOT_TOKEN);
 
-    this._bot.use(
-      session<SessionData, BotContext>({ initial: () => ({ isAuth: false }) }),
-    );
+    this._bot.use(session<SessionData, BotContext>({ initial: () => ({}) }));
 
     const broadcastRepo = new MongodbBroadcastRepository(this.db);
     const videoRepo = new MongodbVideoRepository(this.db);
@@ -65,15 +67,11 @@ export class TelegramBot {
 
     this._bot.use(conversations());
     this._bot.use(
-      createConversation(
-        createBroadcastConv(this.cache),
-        "create-broadcast",
-      ),
+      createConversation(createBroadcastConv(this.cache), "create-broadcast"),
     );
+    this._bot.use(authMiddleware(userRegistrator));
 
     this._bot.command("start", startHandler.handle.bind(startHandler));
-
-    this._bot.start();
   }
 
   async start(): Promise<void> {
