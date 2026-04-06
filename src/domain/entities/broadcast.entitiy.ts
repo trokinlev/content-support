@@ -17,6 +17,13 @@ export enum BroadcastStatus {
   AWAITING_PROCESSING = "awaiting_processing",
 
   /**
+   * Видео обрабатывается
+   *
+   * Видео загружено и в процессе обработки.
+   */
+  PROCESSING = "processing",
+
+  /**
    * Запланирован
    *
    * Видео успешно обработано и готово к публикации.
@@ -85,6 +92,28 @@ export class Broadcast {
     );
   }
 
+  static restore(props: {
+    id: string;
+    ownerId: string;
+    channelId: string;
+    videoId: string | null;
+    status: BroadcastStatus;
+    scheduledStartTime: Date;
+    createdAt: Date;
+    updatedAt: Date;
+  }): Broadcast {
+    return new Broadcast(
+      props.id,
+      props.ownerId,
+      props.channelId,
+      props.videoId,
+      props.status,
+      props.scheduledStartTime,
+      props.createdAt,
+      props.updatedAt,
+    );
+  }
+
   get id(): string {
     return this._id;
   }
@@ -108,5 +137,31 @@ export class Broadcast {
   }
   get updatedAt(): Date {
     return this._updatedAt;
+  }
+
+  setVideoId(videoId: string): void {
+    if (this._videoId !== null) {
+      throw new DomainError("Video ID is already set");
+    }
+
+    const allowedStatuses = [
+      BroadcastStatus.AWAITING_VIDEO,
+      BroadcastStatus.AWAITING_PROCESSING,
+    ];
+
+    if (!allowedStatuses.includes(this._status)) {
+      throw new DomainError(
+        `Cannot set video ID when broadcast is in status: ${this._status}. ` +
+          `Allowed statuses: ${allowedStatuses.join(", ")}`,
+      );
+    }
+
+    if (this._status === BroadcastStatus.CANCELLED) {
+      throw new DomainError("Cannot set video ID for cancelled broadcast");
+    }
+
+    this._videoId = videoId;
+    this._status = BroadcastStatus.AWAITING_PROCESSING;
+    this._updatedAt = new Date();
   }
 }
