@@ -22,7 +22,7 @@ export class ListBroadcastsHandler {
       message += "\n\nНет запланированных событий";
     }
 
-    message += `\n\n<a href="https://t.me/${process.env.BOT_USERNAME}?start=_create-broadcast">➕Запланировать</a>`;
+    message += `\n\n<a href="https://t.me/${process.env.BOT_USERNAME}?start=_scheduled-broadcast">➕Запланировать</a>`;
     message += `\n\n<b>Каналы:</b>`;
 
     if (channels.length) {

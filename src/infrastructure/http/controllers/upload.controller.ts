@@ -1,16 +1,14 @@
 import { Request, Response } from "express";
-import { Video, VideoProcessor, VideoRepository } from "../../../video";
 import path from "node:path";
-import { Broadcast, Notifier } from "../../../broadcast/broadcast";
-import { BroadcastOrganizer } from "../../../broadcast/broadcast-organizer";
+import { Video } from "../../../domain/entities/video.entitiy";
+import { VideoRepository } from "../../../domain/repositories/video.repository";
+import { BroadcastRepository } from "../../../domain/repositories/broadcast.repository";
 
 export class UploadController {
   constructor(
-    private readonly videoProcessor: VideoProcessor,
-    private readonly videoRepo: VideoRepository,
-    private readonly norifier: Notifier,
-    private readonly organizer: BroadcastOrganizer,
     private readonly cache: Map<string, any>,
+    private readonly videoRepo: VideoRepository,
+    private readonly broadcastRepo: BroadcastRepository,
   ) {}
 
   getPageUpload(req: Request, res: Response) {
@@ -22,28 +20,18 @@ export class UploadController {
   }
 
   async uploadVideo(req: Request, res: Response) {
-    const { chatId, broadcast } = this.cache.get(req.params.tempId as string);
+    const { userId, broadcastId, createdAt } = this.cache.get(req.params.tempId as string);
+
     const video = Video.create(req.file?.path!);
-
-    this.videoProcessor.process(video, {
-      onProgress: async (v, data) => {
-        const match = data.match(/frame=\s*(\d+)/);
-        if (match) {
-          console.log(`[Video ${v.id}] Прогресс: кадр ${match[1]}`);
-        }
-      },
-      onComplete: async (v) => {
-        console.log(`[Video ${v.id}] Обработка успешно завершена`);
-        v.converted();
-        await this.videoRepo.save(v);
-        await this.norifier.sendMessage(chatId, "Видео обработано");
-        await this.organizer.scheduleBroadcast(broadcast, video);
-      },
-    });
-
-    video.startProcess();
     await this.videoRepo.save(video);
-    broadcast.videoId = video.id;
+
+    const broadcast = await this.broadcastRepo.findById(broadcastId);
+    if (!broadcast) {
+      return res.status(404).json({ message: "Broadcast not found" });
+    }
+
+    broadcast.setVideoId(video.id);
+    await this.broadcastRepo.save(broadcast);
 
     res.status(200).json({message: "Видео загружено"})
   }

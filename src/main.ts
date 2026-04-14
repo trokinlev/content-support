@@ -8,10 +8,13 @@ import { ListBroadcastsHandler } from "./infrastructure/telegram/handlers/list-b
 import { MongodbBroadcastRepository } from "./infrastructure/database/mongodb/broadcast.repository";
 import { MongodbChannelRepository } from "./infrastructure/database/mongodb/channel.repository";
 import { ChannelRegistrator } from "./domain/services/channel-registrator";
+import { listen } from "./infrastructure/http/server";
+import { UploadController } from "./infrastructure/http/controllers/upload.controller";
+import { MongodbVideoRepository } from "./infrastructure/database/mongodb/video.repository";
 
 async function bootstrap() {
   const db = await database.connect();
-
+  const scheduledBroadcastsCache: Map<string, any> = new Map();
   const userRepo = new MongodbUserRepository(db);
   const broadcastRepo = new MongodbBroadcastRepository(db)
   const userRegistrator = new UserRegistrator(userRepo);
@@ -19,9 +22,11 @@ async function bootstrap() {
   const channelRegistrator = new ChannelRegistrator(channelRepo);
   const listBroadcastsHandler = new ListBroadcastsHandler(broadcastRepo, channelRepo);
   const startHandler = new StartHandler(listBroadcastsHandler);
+  const videoRepo = new MongodbVideoRepository(db);
 
-  const bot = new TelegramBot(userRegistrator, channelRegistrator, startHandler);
+  const bot = new TelegramBot(scheduledBroadcastsCache, channelRepo, broadcastRepo, userRegistrator, channelRegistrator, startHandler);
   bot.start();
+  listen(new UploadController(scheduledBroadcastsCache, videoRepo, broadcastRepo), scheduledBroadcastsCache);
 }
 
 bootstrap();

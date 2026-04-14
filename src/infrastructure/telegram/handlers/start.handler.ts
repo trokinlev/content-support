@@ -17,6 +17,10 @@ export class StartHandler {
         ctx.match = id;
         await ctx.conversation.enter("create-new-channel");
         break;
+      case "scheduled-broadcast":
+        ctx.match = id;
+        await ctx.conversation.enter("scheduled-new-broadcast");
+        break;
     }
   }
 }
