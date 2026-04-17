@@ -139,6 +139,52 @@ export class Broadcast {
     return this._updatedAt;
   }
 
+  completeProcessing(): void {
+    if (this._status !== BroadcastStatus.PROCESSING) {
+      throw new DomainError(
+        `Cannot complete processing from status: ${this._status}`,
+      );
+    }
+
+    this._status = BroadcastStatus.SCHEDULED;
+    this._updatedAt = new Date();
+  }
+
+  startLive(): void {
+    if (this._status !== BroadcastStatus.SCHEDULED) {
+      throw new DomainError(`Cannot start live from status: ${this._status}`);
+    }
+
+    // if (new Date() < this._scheduledStartTime) {
+    //   throw new DomainError("Cannot start live before scheduled time");
+    // }
+
+    this._status = BroadcastStatus.LIVE;
+    this._updatedAt = new Date();
+  }
+
+  startProcessing(): void {
+    const allowedStatuses = [BroadcastStatus.AWAITING_PROCESSING];
+
+    if (!allowedStatuses.includes(this._status)) {
+      throw new DomainError(
+        `Cannot start processing when broadcast is in status: ${this._status}. ` +
+          `Allowed status: ${allowedStatuses.join(", ")}`,
+      );
+    }
+
+    if (this._status === BroadcastStatus.CANCELLED) {
+      throw new DomainError("Cannot process cancelled broadcast");
+    }
+
+    if (!this._videoId) {
+      throw new DomainError("Cannot start processing without video ID");
+    }
+
+    this._status = BroadcastStatus.PROCESSING;
+    this._updatedAt = new Date();
+  }
+
   setVideoId(videoId: string): void {
     if (this._videoId !== null) {
       throw new DomainError("Video ID is already set");
@@ -162,6 +208,41 @@ export class Broadcast {
 
     this._videoId = videoId;
     this._status = BroadcastStatus.AWAITING_PROCESSING;
+    this._updatedAt = new Date();
+  }
+
+  cancel(): void {
+    const allowedStatuses = [
+      BroadcastStatus.AWAITING_VIDEO,
+      BroadcastStatus.AWAITING_PROCESSING,
+      BroadcastStatus.PROCESSING,
+      BroadcastStatus.SCHEDULED,
+    ];
+
+    if (!allowedStatuses.includes(this._status)) {
+      throw new DomainError(
+        `Cannot cancel broadcast from status: ${this._status}. ` +
+          `Allowed statuses: ${allowedStatuses.join(", ")}`,
+      );
+    }
+
+    if (this._status === BroadcastStatus.COMPLETED) {
+      throw new DomainError("Cannot cancel already completed broadcast");
+    }
+
+    this._status = BroadcastStatus.CANCELLED;
+    this._updatedAt = new Date();
+  }
+
+  complete(): void {
+    if (this._status !== BroadcastStatus.LIVE) {
+      throw new DomainError(
+        `Cannot complete broadcast from status: ${this._status}. ` +
+          `Only LIVE broadcasts can be completed`,
+      );
+    }
+
+    this._status = BroadcastStatus.COMPLETED;
     this._updatedAt = new Date();
   }
 }

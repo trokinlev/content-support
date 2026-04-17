@@ -3,12 +3,17 @@ import path from "node:path";
 import { Video } from "../../../domain/entities/video.entitiy";
 import { VideoRepository } from "../../../domain/repositories/video.repository";
 import { BroadcastRepository } from "../../../domain/repositories/broadcast.repository";
+import { FFmpegVideoProcessor } from "../../ffmpeg/ffmpeg-video-processor";
+import { BroadcastStatus } from "../../../domain/entities/broadcast.entitiy";
+import { BroadcastOrganizer } from "../../../domain/services/broadcast-organizer";
 
 export class UploadController {
   constructor(
     private readonly cache: Map<string, any>,
     private readonly videoRepo: VideoRepository,
     private readonly broadcastRepo: BroadcastRepository,
+    private readonly videoProcessor: FFmpegVideoProcessor,
+    private readonly broadcastOrganizer: BroadcastOrganizer,
   ) {}
 
   getPageUpload(req: Request, res: Response) {
@@ -32,6 +37,28 @@ export class UploadController {
 
     broadcast.setVideoId(video.id);
     await this.broadcastRepo.save(broadcast);
+
+    this.videoProcessor.process(video, {
+      onProgress: async (processedVideo, data) => {
+        if (broadcast.status !== BroadcastStatus.PROCESSING) {
+          broadcast.startProcessing();
+          await this.broadcastRepo.save(broadcast);
+        }
+
+        console.log(`Processing video ${processedVideo.id}: ${data}`);
+      },
+      onComplete: async (processedVideo) => {
+        await this.videoRepo.save(processedVideo);
+
+        broadcast.completeProcessing();
+        await this.broadcastRepo.save(broadcast);
+
+        await this.broadcastOrganizer.scheduleBroadcast(broadcast);
+        console.log(`Video ${processedVideo.id} processing complete`);
+      },
+    }).catch((err) => {
+      console.error("Error processing video:", err);
+    });
 
     res.status(200).json({message: "Видео загружено"})
   }

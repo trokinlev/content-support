@@ -8,8 +8,17 @@ import { Channel } from "../entities/channel.entitiy";
 import { Video } from "../entities/video.entitiy";
 
 export interface Broadcaster {
-  start(broadcast: Broadcast, video: Video, channel: Channel, activeStreams: Map<string, ChildProcessWithoutNullStreams>): Promise<void>;
-  stop(): Promise<void>;
+  start(
+    broadcastRepo: BroadcastRepository,
+    broadcast: Broadcast,
+    video: Video,
+    channel: Channel,
+    activeStreams: Map<string, ChildProcessWithoutNullStreams>,
+  ): Promise<void>;
+  stop(
+    broadcastId: string,
+    activeStreams: Map<string, ChildProcessWithoutNullStreams>,
+  ): Promise<void>;
 }
 
 export class BroadcastOrganizer {
@@ -23,6 +32,68 @@ export class BroadcastOrganizer {
     private readonly channelRepo: ChannelRepository,
     private readonly videoRepo: VideoRepository,
   ) {}
+
+  async restoreScheduledBroadcasts(): Promise<void> {
+    const broadcasts = await this.broadcastRepo.findAll();
+
+    // Находим все стримы со статусом SCHEDULED
+    const scheduledBroadcasts = broadcasts.filter(
+      (broadcast) => broadcast.status === BroadcastStatus.SCHEDULED,
+    );
+
+    for (const broadcast of scheduledBroadcasts) {
+      const now = new Date();
+
+      if (broadcast.scheduledStartTime <= now) {
+        console.warn(
+          `Broadcast ${broadcast.id} has scheduled time in the past, skipping restore`,
+        );
+        continue;
+      }
+
+      if (!broadcast.videoId) {
+        console.error(
+          `Broadcast ${broadcast.id} is SCHEDULED but has no videoId`,
+        );
+        continue;
+      }
+
+      try {
+        const video = await this.videoRepo.findById(broadcast.videoId);
+        const channel = await this.channelRepo.findById(broadcast.channelId);
+
+        if (this.timers.has(broadcast.id)) {
+          console.warn(
+            `Timer for broadcast ${broadcast.id} already exists, skipping`,
+          );
+          continue;
+        }
+
+        const delay = broadcast.scheduledStartTime.getTime() - now.getTime();
+
+        const timer = setTimeout(() => {
+          broadcast.startLive();
+          this.broadcastRepo.save(broadcast).catch((err) => {
+            console.error(
+              `Failed to update broadcast ${broadcast.id} status to LIVE:`,
+              err,
+            );
+          });
+          this.broadcaster.start(this.broadcastRepo, broadcast, video!, channel!, this.activeStreams);
+        }, delay);
+
+        this.timers.set(broadcast.id, timer);
+
+        console.log(
+          `Restored timer for broadcast ${broadcast.id}, will start in ${delay}ms`,
+        );
+      } catch (error) {
+        console.error(`Failed to restore broadcast ${broadcast.id}:`, error);
+      }
+    }
+
+    console.log(`Restored ${this.timers.size} scheduled broadcasts`);
+  }
 
   // async restoreScheduledBroadcasts(): Promise<void> {
   //   const broadcasts = await this.broadcastRepo.getAll();
@@ -66,6 +137,10 @@ export class BroadcastOrganizer {
         continue;
       }
 
+      if (other.id === broadcast.id) {
+        continue;
+      }
+
       if (other.scheduledStartTime === broadcast.scheduledStartTime) {
         throw new DomainError(
           "Время старта стрима совпадает для одного источника",
@@ -99,8 +174,10 @@ export class BroadcastOrganizer {
 
     const now = new Date();
     const delay = broadcast.scheduledStartTime.getTime() - now.getTime();
-    const timer = setTimeout(() => {
-      this.broadcaster.start(broadcast, video!, channel!, this.activeStreams);
+    const timer = setTimeout(async () => {
+      broadcast.startLive();
+      await this.broadcastRepo.save(broadcast);
+      this.broadcaster.start(this.broadcastRepo, broadcast, video!, channel!, this.activeStreams);
     }, delay);
     this.timers.set(broadcast.id, timer);
   }

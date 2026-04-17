@@ -65,6 +65,11 @@ export class TelegramBot {
     this._bot.use(authMiddleware(this.userRegistrator));
 
     this._bot.command("start", this.startHandler.handle);
+
+    this._bot.catch((error) => {
+      console.error("Error in Telegram bot:", error);
+    });
+
   }
 
   async start(): Promise<void> {

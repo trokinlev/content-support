@@ -51,4 +51,14 @@ export class Video {
   get updatedAt(): Date {
     return this._updatedAt;
   }
+
+  setDuration(duration: number) {
+    this._duration = duration;
+    this._updatedAt = new Date();
+  }
+
+  setFormattedPath(formattedPath: string) {
+    this._formattedPath = formattedPath;
+    this._updatedAt = new Date();
+  }
 }
